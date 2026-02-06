@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWU Card Scanner</title>
+  <link rel="stylesheet" href="css/styles.css?v=13">
+  <!-- SheetJS for Excel export (~30KB) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+</head>
+<body>
+  <header id="app-header">
+    <h1 class="app-title">SWU <span class="title-accent">Card Scanner</span></h1>
+    <nav id="tab-nav">
+      <button data-tab="scan" class="tab-btn active">Scan</button>
+      <button data-tab="collection" class="tab-btn">Collection</button>
+      <button data-tab="orders" class="tab-btn">Orders</button>
+      <button data-tab="export" class="tab-btn">Export</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ==================== SCAN TAB ==================== -->
+    <section id="tab-scan" class="tab-panel active">
+      <div id="scan-controls">
+        <div id="scan-mode-toggle">
+          <button id="mode-single" class="mode-btn active">Single Card</button>
+          <button id="mode-binder" class="mode-btn">Binder Page (3&times;3)</button>
+        </div>
+        <div id="camera-buttons">
+          <button id="btn-start-camera" class="btn-primary">Start Camera</button>
+          <button id="btn-stop-camera" class="btn-secondary" hidden>Stop Camera</button>
+        </div>
+      </div>
+
+      <div id="camera-container" hidden>
+        <video id="camera-preview" autoplay playsinline muted></video>
+        <canvas id="capture-canvas"></canvas>
+        <div id="camera-overlay"></div>
+      </div>
+
+      <div id="capture-controls" hidden>
+        <button id="btn-capture" class="btn-primary btn-large">Capture</button>
+        <button id="btn-auto-scan" class="btn-secondary">Auto-Scan</button>
+        <button id="btn-flip-camera" class="btn-secondary">Flip Camera</button>
+      </div>
+
+      <div id="auto-scan-indicator" hidden>
+        <div class="auto-scan-pulse"></div>
+        <span id="auto-scan-indicator-text">Watching for card...</span>
+      </div>
+
+      <div id="scan-status" hidden>
+        <div class="spinner"></div>
+        <p id="scan-status-text">Processing...</p>
+      </div>
+
+      <div id="camera-error" hidden>
+        <p id="camera-error-text"></p>
+      </div>
+
+      <div id="catalog-status" hidden>
+        <div class="spinner spinner-small"></div>
+        <span id="catalog-status-text">Loading card database...</span>
+      </div>
+
+      <div id="manual-search">
+        <div id="search-header">
+          <h3>Manual Search</h3>
+          <label id="quick-add-toggle">
+            <input type="checkbox" id="chk-quick-add" checked>
+            <span class="toggle-label">Quick Add</span>
+          </label>
+        </div>
+        <div class="search-bar">
+          <input id="search-input" type="text" placeholder="Type card name... (results appear instantly)" autocomplete="off">
+          <button id="btn-search" class="btn-primary">Search</button>
+        </div>
+        <div id="quick-add-banner" hidden>
+          <span id="session-add-count">0</span> cards added this session
+          <button id="btn-reset-session" class="btn-secondary" style="padding:2px 8px;font-size:0.7rem;margin-left:8px">Reset</button>
+        </div>
+        <div id="search-results"></div>
+      </div>
+    </section>
+
+    <!-- ==================== COLLECTION TAB ==================== -->
+    <section id="tab-collection" class="tab-panel">
+      <div id="collection-header">
+        <div id="collection-stats">
+          <span id="total-cards-count">0 cards</span>
+          <span class="stat-divider">|</span>
+          <span id="total-value">$0.00</span>
+        </div>
+        <div id="collection-controls">
+          <div id="view-toggle">
+            <button id="view-grid" class="view-btn active" title="Grid view">&#9638;</button>
+            <button id="view-list" class="view-btn" title="List view">&#9776;</button>
+          </div>
+          <input id="collection-filter" type="text" placeholder="Filter collection...">
+          <select id="collection-sort">
+            <option value="dateAdded-desc">Newest First</option>
+            <option value="dateAdded-asc">Oldest First</option>
+            <option value="name-asc">Name A-Z</option>
+            <option value="name-desc">Name Z-A</option>
+            <option value="price-desc">Price High-Low</option>
+            <option value="price-asc">Price Low-High</option>
+            <option value="set-asc">Set</option>
+            <option value="rarity-desc">Rarity</option>
+          </select>
+          <button id="btn-needs-price" class="btn-price-check" title="Show cards that need a price check">Needs Price Check <span id="price-check-count" class="badge">0</span></button>
+        </div>
+      </div>
+
+      <div id="collection-empty" hidden>
+        <p>No cards in your collection yet. Head to the <strong>Scan</strong> tab to get started!</p>
+      </div>
+
+      <div id="collection-grid" class="collection-view active"></div>
+
+      <div id="collection-table-wrap" class="collection-view" hidden>
+        <table id="collection-table">
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th data-sort="name">Name</th>
+              <th data-sort="set">Set</th>
+              <th data-sort="number">Number</th>
+              <th data-sort="rarity">Rarity</th>
+              <th data-sort="type">Type</th>
+              <th data-sort="quantity">Qty</th>
+              <th data-sort="marketPrice">Market $</th>
+              <th data-sort="customPrice">Custom $</th>
+              <th data-sort="totalValue">Total $</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="collection-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== ORDERS TAB ==================== -->
+    <section id="tab-orders" class="tab-panel">
+
+      <!-- New Order / Cart -->
+      <div class="export-section">
+        <h3>New Order</h3>
+
+        <div id="order-buyer-row">
+          <label>Buyer Name:
+            <input id="order-buyer-name" type="text" placeholder="Enter buyer's name...">
+          </label>
+        </div>
+
+        <div id="order-discount-row">
+          <label>Discount:
+            <select id="order-discount">
+              <option value="75">75% of Market (25% off)</option>
+              <option value="80">80% of Market (20% off)</option>
+              <option value="90">90% of Market (10% off)</option>
+              <option value="100">Full Market Price</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </label>
+          <label id="order-custom-discount-label" hidden>
+            Custom %:
+            <input id="order-custom-discount" type="number" min="1" max="100" value="75" step="1">
+          </label>
+        </div>
+
+        <div id="order-search-section">
+          <h4>Search Your Collection</h4>
+          <div class="search-bar">
+            <input id="order-search-input" type="text" placeholder="Search cards in your collection..." autocomplete="off">
+            <button id="btn-order-search" class="btn-primary">Search</button>
+          </div>
+          <div id="order-search-results"></div>
+        </div>
+      </div>
+
+      <!-- Cart Display -->
+      <div class="export-section" id="order-cart-display">
+        <h3>Cart <span id="cart-item-count">(0 items)</span></h3>
+        <div id="order-cart-empty">
+          <p style="color:var(--text-secondary)">Search for cards above and add them to the cart.</p>
+        </div>
+        <div id="order-cart-table-wrap" hidden>
+          <table id="order-cart-table">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th>Variant</th>
+                <th>Set</th>
+                <th>Avail</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Disc.</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="order-cart-body"></tbody>
+            <tfoot>
+              <tr id="order-cart-totals">
+                <td colspan="7" style="text-align:right;font-weight:700">Order Total:</td>
+                <td id="order-cart-total-amount" style="font-weight:700;color:var(--accent-green)">$0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div id="order-actions" hidden>
+          <button id="btn-complete-order" class="btn-primary btn-large">Complete Order</button>
+          <button id="btn-clear-cart" class="btn-secondary">Clear Cart</button>
+          <button id="btn-copy-cart" class="btn-secondary">Copy to Clipboard</button>
+        </div>
+      </div>
+
+      <!-- Sales History -->
+      <div class="export-section">
+        <h3>Sales History</h3>
+        <div id="order-history-stats">
+          <span id="total-orders-count">0 orders</span>
+          <span class="stat-divider">|</span>
+          <span id="total-sales-amount">$0.00</span>
+        </div>
+        <div id="order-history-list"></div>
+        <div id="order-history-empty" hidden>
+          <p style="color:var(--text-secondary)">No orders yet. Complete your first sale above!</p>
+        </div>
+        <div id="order-history-actions" hidden>
+          <button id="btn-export-all-orders" class="btn-primary">Export All Orders (Excel)</button>
+          <button id="btn-export-orders-json" class="btn-secondary">Export Orders (JSON)</button>
+        </div>
+      </div>
+
+      <!-- Google Sheets Sync -->
+      <div class="export-section">
+        <h3>Google Sheets Sync</h3>
+        <p>Sync orders to your Google Sheet. Set up a Google Apps Script endpoint, paste the URL below, and orders will auto-sync on completion. You can also use "Copy to Clipboard" on any order to paste directly into Sheets.</p>
+        <div id="gsheet-config">
+          <input id="gsheet-url" type="text" placeholder="Google Apps Script Web App URL..." style="width:100%;margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button id="btn-save-gsheet-url" class="btn-secondary">Save URL</button>
+            <button id="btn-test-gsheet" class="btn-secondary">Test Connection</button>
+            <span id="gsheet-status"></span>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button id="btn-toggle-gsheet-help" class="btn-secondary" style="font-size:0.75rem;padding:4px 10px">Show Setup Guide</button>
+          <div id="gsheet-help-block" hidden style="margin-top:10px">
+            <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px">1. Open your Google Sheet &rarr; Extensions &rarr; Apps Script<br>2. Paste this code and save:<br>3. Deploy &rarr; New deployment &rarr; Web app &rarr; "Anyone" &rarr; Deploy<br>4. Copy the URL and paste it above.</p>
+            <pre style="background:var(--bg-primary);color:var(--accent-blue);padding:12px;border-radius:var(--radius-sm);font-size:0.7rem;overflow-x:auto;white-space:pre;max-height:260px;overflow-y:auto">function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Orders');
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('Orders');
+    sheet.appendRow(['Date', 'Buyer', 'Card', 'Subtitle', 'Set',
+      'Number', 'Variant', 'Qty', 'Market $', 'Discounted $', 'Line Total']);
+  }
+
+  var data = JSON.parse(e.postData.contents);
+
+  if (data.action === 'test') {
+    sheet.appendRow(['TEST', new Date().toISOString(), 'Connection OK']);
+    return ContentService.createTextOutput('OK');
+  }
+
+  var items = data.items || [];
+  for (var i = 0; i &lt; items.length; i++) {
+    var item = items[i];
+    sheet.appendRow([
+      data.date, data.buyerName, item.name, item.subtitle,
+      item.set, item.number, item.variant, item.qty,
+      item.price, item.discounted, item.lineTotal
+    ]);
+  }
+
+  return ContentService.createTextOutput('OK');
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== EXPORT TAB ==================== -->
+    <section id="tab-export" class="tab-panel">
+      <div class="export-section">
+        <h3>Export Collection</h3>
+        <p>Download your collection data for use in spreadsheets or as a backup.</p>
+        <div class="export-options">
+          <label>Sort by:
+            <select id="export-sort">
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+              <option value="price-desc">Price High-Low</option>
+              <option value="price-asc">Price Low-High</option>
+              <option value="set-asc">Set</option>
+              <option value="rarity-desc">Rarity (Legendary first)</option>
+              <option value="aspect-asc">Aspect</option>
+              <option value="type-asc">Type</option>
+              <option value="dateAdded-desc">Newest First</option>
+            </select>
+          </label>
+        </div>
+        <div class="export-buttons">
+          <button id="btn-export-excel" class="btn-primary">Export as Excel</button>
+          <button id="btn-export-ff" class="btn-primary" style="background:var(--accent-blue)">Export Friends &amp; Family (75%)</button>
+          <button id="btn-export-json" class="btn-secondary">Export as JSON (Backup)</button>
+        </div>
+      </div>
+
+      <div class="export-section">
+        <h3>Sync to Google Sheet</h3>
+        <p>Push your entire collection to your Google Sheet. This <strong>replaces all data</strong> in the sheet with your current collection.</p>
+        <div class="export-options">
+          <label>Discount:
+            <select id="sync-discount">
+              <option value="75" selected>75% of Market</option>
+              <option value="80">80% of Market</option>
+              <option value="90">90% of Market</option>
+              <option value="100">100% (Full Market)</option>
+            </select>
+          </label>
+          <label>Sort by:
+            <select id="sync-sort">
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+              <option value="price-desc">Price High-Low</option>
+              <option value="price-asc">Price Low-High</option>
+              <option value="set-asc">Set</option>
+              <option value="rarity-desc">Rarity (Legendary first)</option>
+              <option value="aspect-asc">Aspect</option>
+              <option value="type-asc">Type</option>
+              <option value="dateAdded-desc">Newest First</option>
+            </select>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <button id="btn-sync-collection-sheet" class="btn-primary" style="background:var(--accent-blue)">Sync to Google Sheet</button>
+          <span id="sync-collection-status"></span>
+        </div>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Requires a Google Apps Script URL (set up in Orders tab &rarr; Google Sheets Sync).</p>
+        <div style="margin-top:10px">
+          <button id="btn-toggle-sync-help" class="btn-secondary" style="font-size:0.75rem;padding:4px 10px">Show Apps Script Code</button>
+          <div id="sync-help-block" hidden style="margin-top:10px">
+            <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px">Update your Apps Script with this code. It handles both <strong>orders</strong> and <strong>collection sync</strong>. Re-deploy after updating.</p>
+            <pre style="background:var(--bg-primary);color:var(--accent-blue);padding:12px;border-radius:var(--radius-sm);font-size:0.7rem;overflow-x:auto;white-space:pre;max-height:340px;overflow-y:auto">function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+
+  // === TEST ===
+  if (data.action === 'test') {
+    var s = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    s.appendRow(['TEST', new Date().toISOString(), 'Connection OK']);
+    return ContentService.createTextOutput('OK');
+  }
+
+  // === SYNC COLLECTION (full replace) ===
+  if (data.action === 'syncCollection') {
+    // Uses the FIRST sheet in the spreadsheet
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+
+    // Write header if sheet is empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['Name','Subtitle','Set','Number','Rarity',
+        'Type','Aspects','Variant Type','Quantity',
+        'Market Price','Discounted Price','','Notes','Front Art']);
+    }
+
+    // Clear all data rows (keep header row 1)
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    }
+
+    // Write collection rows
+    var rows = data.rows || [];
+    for (var i = 0; i &lt; rows.length; i++) {
+      var r = rows[i];
+      sheet.appendRow([
+        r.name, r.subtitle, r.set, r.number, r.rarity, r.type,
+        r.aspects, r.variantType, r.quantity,
+        '$' + r.marketPrice, '$' + r.discountedPrice, '', r.notes, r.frontArt || ''
+      ]);
+    }
+    return ContentService.createTextOutput('OK');
+  }
+
+  // === ADD ORDER (append to Orders sheet) ===
+  if (data.action === 'addOrder') {
+    var orderSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Orders');
+    if (!orderSheet) {
+      orderSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('Orders');
+      orderSheet.appendRow(['Date','Buyer','Card','Subtitle','Set',
+        'Number','Variant','Qty','Market $','Discounted $','Line Total']);
+    }
+    var items = data.items || [];
+    for (var j = 0; j &lt; items.length; j++) {
+      var item = items[j];
+      orderSheet.appendRow([
+        data.date, data.buyerName, item.name, item.subtitle,
+        item.set, item.number, item.variant, item.qty,
+        item.price, item.discounted, item.lineTotal
+      ]);
+    }
+    return ContentService.createTextOutput('OK');
+  }
+
+  return ContentService.createTextOutput('Unknown action');
+}</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="export-section">
+        <h3>Import Collection</h3>
+        <p>Import from a JSON backup file. This will <strong>merge</strong> with your existing data (duplicates are skipped).</p>
+        <div class="import-area">
+          <input type="file" id="import-file" accept=".json">
+          <button id="btn-import-json" class="btn-primary">Import JSON</button>
+        </div>
+      </div>
+
+      <div class="export-section">
+        <h3>Refresh Prices</h3>
+        <p>Update market prices for all cards in your collection from the SWU-DB API.</p>
+        <button id="btn-refresh-prices" class="btn-secondary">Refresh All Prices</button>
+        <div id="price-refresh-status" hidden>
+          <div class="spinner spinner-small"></div>
+          <span id="price-refresh-text">Refreshing...</span>
+        </div>
+      </div>
+
+      <div class="export-section">
+        <h3>Card Database</h3>
+        <p>Re-download all card data and scanner hashes. Do this when new sets are released or prices need updating.</p>
+        <button id="btn-rebuild-hashes" class="btn-secondary">Rebuild Card Database</button>
+        <div id="hash-rebuild-status" hidden>
+          <div class="spinner spinner-small"></div>
+          <span id="hash-rebuild-text">Rebuilding...</span>
+        </div>
+      </div>
+
+      <div class="export-section danger-zone">
+        <h3>Danger Zone</h3>
+        <button id="btn-clear-collection" class="btn-danger">Clear Entire Collection</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== CARD CONFIRMATION MODAL ==================== -->
+  <dialog id="card-confirm-dialog">
+    <div class="dialog-content">
+      <h2>Confirm Card</h2>
+      <div id="dialog-card-preview">
+        <div id="dialog-card-image-wrap">
+          <img id="dialog-card-image" src="" alt="Card">
+        </div>
+        <div id="dialog-card-info">
+          <p class="info-row"><span class="info-label">OCR Text:</span> <span id="dialog-ocr-text" class="info-value ocr-text"></span></p>
+          <p class="info-row"><span class="info-label">Matched:</span> <span id="dialog-matched-name" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Subtitle:</span> <span id="dialog-subtitle" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Set:</span> <span id="dialog-set" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Number:</span> <span id="dialog-number" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Rarity:</span> <span id="dialog-rarity" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Type:</span> <span id="dialog-type" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Variant:</span> <span id="dialog-variant" class="info-value"></span></p>
+          <p class="info-row"><span class="info-label">Market Price:</span> $<span id="dialog-price" class="info-value"></span></p>
+          <p id="dialog-duplicate-notice" class="duplicate-notice" hidden>This card is already in your collection!</p>
+        </div>
+      </div>
+
+      <div id="dialog-variants-section" hidden>
+        <h3>Art Variants <span id="dialog-variants-count"></span></h3>
+        <div id="dialog-variants-list"></div>
+      </div>
+      <div id="dialog-variants-loading" hidden>
+        <div class="spinner spinner-small"></div>
+        <span>Loading variants...</span>
+      </div>
+      <!-- Variants auto-load when dialog opens -->
+
+      <div id="dialog-alternatives" hidden>
+        <h3>Did you mean one of these?</h3>
+        <div id="dialog-alt-list"></div>
+      </div>
+
+      <div id="dialog-actions">
+        <label>Quantity: <input id="dialog-quantity" type="number" value="1" min="1" max="99"></label>
+        <label>Custom Price: <input id="dialog-custom-price" type="number" step="0.01" min="0" placeholder="Optional override"></label>
+        <label>Notes: <input id="dialog-notes" type="text" placeholder="Optional notes"></label>
+      </div>
+
+      <div class="dialog-buttons">
+        <button id="btn-confirm-add" class="btn-primary">Add to Collection</button>
+        <button id="btn-confirm-skip" class="btn-secondary">Skip</button>
+        <button id="btn-confirm-retry" class="btn-secondary">Search Again</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ==================== CARD EDIT MODAL ==================== -->
+  <dialog id="card-edit-dialog">
+    <div class="dialog-content">
+      <h2>Edit Card</h2>
+      <div id="edit-card-preview">
+        <img id="edit-card-image" src="" alt="Card">
+        <div id="edit-card-name"></div>
+      </div>
+      <div id="edit-fields">
+        <label>Quantity: <input id="edit-quantity" type="number" min="1" max="99"></label>
+        <label>Custom Price ($): <input id="edit-custom-price" type="number" step="0.01" min="0" placeholder="Leave blank for market price"></label>
+        <label>Notes: <textarea id="edit-notes" rows="2" placeholder="Optional notes"></textarea></label>
+      </div>
+      <div class="dialog-buttons">
+        <button id="btn-edit-save" class="btn-primary">Save</button>
+        <button id="btn-edit-delete" class="btn-danger">Remove</button>
+        <button id="btn-edit-cancel" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ==================== BINDER PROGRESS MODAL ==================== -->
+  <dialog id="binder-progress-dialog">
+    <div class="dialog-content">
+      <h2>Processing Binder Page</h2>
+      <p>Scanning card <span id="binder-current">0</span> of <span id="binder-total">9</span></p>
+      <div class="progress-bar">
+        <div id="binder-progress-fill" class="progress-fill" style="width:0%"></div>
+      </div>
+      <div id="binder-results"></div>
+      <div class="dialog-buttons">
+        <button id="btn-binder-done" class="btn-primary" hidden>Done</button>
+        <button id="btn-binder-cancel" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ==================== TOAST CONTAINER ==================== -->
+  <div id="toast-container"></div>
+
+  <!-- ==================== SCRIPTS (load order matters) ==================== -->
+  <script src="js/db.js?v=13"></script>
+  <script src="js/api.js?v=13"></script>
+  <script src="js/ocr.js?v=13"></script>
+  <script src="js/camera.js?v=13"></script>
+  <script src="js/export.js?v=13"></script>
+  <script src="js/orders.js?v=13"></script>
+  <script src="js/app.js?v=13"></script>
+</body>
+</html>

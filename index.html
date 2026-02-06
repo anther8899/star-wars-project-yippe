@@ -371,6 +371,253 @@
       margin-top: 40px;
     }
 
+    /* === Card Add Button === */
+    .card-tile-add {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(102, 187, 106, 0.9);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s, transform 0.15s;
+      z-index: 5;
+    }
+    .card-tile:hover .card-tile-add { opacity: 1; }
+    .card-tile-add:hover { transform: scale(1.15); background: var(--accent-green); }
+    .card-tile-add.added {
+      background: var(--accent-gold);
+      opacity: 1;
+    }
+
+    /* === Buyer Cart Panel === */
+    #buyer-cart-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 200;
+      background: var(--accent-green);
+      color: #111;
+      border: none;
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.15s, background 0.15s;
+      font-family: var(--font-main);
+    }
+    #buyer-cart-toggle:hover { transform: scale(1.05); }
+    #buyer-cart-toggle .cart-badge {
+      background: var(--accent-red);
+      color: #fff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    #buyer-cart-toggle[hidden] { display: none; }
+
+    #buyer-cart-panel {
+      position: fixed;
+      top: 0;
+      right: -420px;
+      width: 400px;
+      max-width: 90vw;
+      height: 100vh;
+      background: var(--bg-secondary);
+      border-left: 2px solid var(--accent-gold);
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s ease;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+    }
+    #buyer-cart-panel.open { right: 0; }
+
+    #buyer-cart-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 250;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #buyer-cart-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .cart-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .cart-panel-header h2 { font-size: 1.1rem; }
+    .cart-panel-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-family: var(--font-main);
+    }
+    .cart-panel-close:hover { color: var(--accent-red); }
+
+    .cart-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .cart-panel-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 40px 16px;
+      font-size: 0.9rem;
+    }
+
+    .cart-item {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .cart-item-img {
+      width: 45px;
+      height: 63px;
+      object-fit: cover;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .cart-item-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cart-item-meta { font-size: 0.75rem; color: var(--text-secondary); }
+    .cart-item-price { font-size: 0.85rem; color: var(--accent-green); font-weight: 600; }
+
+    .cart-item-qty {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-item-qty button {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      width: 26px;
+      height: 26px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: var(--font-main);
+    }
+    .cart-item-qty button:hover { background: var(--bg-hover); }
+    .cart-item-qty span { font-weight: 600; min-width: 18px; text-align: center; }
+
+    .cart-item-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 4px;
+      font-family: var(--font-main);
+    }
+    .cart-item-remove:hover { color: var(--accent-red); }
+
+    .cart-panel-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+    .cart-total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .cart-total-row .total-price { color: var(--accent-green); }
+
+    .cart-panel-footer .cart-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-copy-wishlist {
+      background: var(--accent-gold);
+      color: #111;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: background 0.15s;
+    }
+    .btn-copy-wishlist:hover { background: #e6b800; }
+
+    .btn-clear-wishlist {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: var(--font-main);
+    }
+    .btn-clear-wishlist:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+    .cart-copied-msg {
+      text-align: center;
+      color: var(--accent-green);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 0;
+      display: none;
+    }
+
+    .buyer-name-input {
+      width: 100%;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-family: var(--font-main);
+      outline: none;
+    }
+    .buyer-name-input:focus { border-color: var(--accent-blue); }
+
     /* === Responsive === */
     @media (max-width: 600px) {
       .app-title { font-size: 1.1rem; }
@@ -381,6 +628,8 @@
       #view-toggle { margin-left: 0; align-self: stretch; }
       .view-btn { flex: 1; text-align: center; }
       #grid-view { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+      #buyer-cart-panel { width: 100%; max-width: 100vw; right: -100%; }
+      #buyer-cart-toggle { bottom: 12px; right: 12px; padding: 10px 16px; font-size: 0.85rem; }
     }
 
     @media (min-width: 768px) {
@@ -476,6 +725,37 @@
     </div>
   </main>
 
+  <!-- Buyer Cart Toggle Button -->
+  <button id="buyer-cart-toggle" hidden>
+    🛒 My List <span class="cart-badge" id="buyer-cart-badge">0</span>
+  </button>
+
+  <!-- Cart Overlay -->
+  <div id="buyer-cart-overlay"></div>
+
+  <!-- Cart Slide Panel -->
+  <div id="buyer-cart-panel">
+    <div class="cart-panel-header">
+      <h2>My Wishlist</h2>
+      <button class="cart-panel-close" id="buyer-cart-close">&times;</button>
+    </div>
+    <div class="cart-panel-body" id="buyer-cart-body">
+      <div class="cart-panel-empty">Click the + button on cards to add them here.</div>
+    </div>
+    <div class="cart-panel-footer">
+      <input type="text" class="buyer-name-input" id="buyer-name" placeholder="Your name (optional)">
+      <div class="cart-total-row">
+        <span>Total:</span>
+        <span class="total-price" id="buyer-cart-total">$0.00</span>
+      </div>
+      <div class="cart-actions">
+        <button class="btn-copy-wishlist" id="btn-copy-wishlist">📋 Copy Wishlist to Send</button>
+        <div class="cart-copied-msg" id="cart-copied-msg">Copied! Send this to the seller.</div>
+        <button class="btn-clear-wishlist" id="btn-clear-wishlist">Clear All</button>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <p>Prices updated on each sync. Contact seller to purchase.</p>
   </footer>
@@ -490,10 +770,12 @@
       allCards: [],
       filteredCards: [],
       viewMode: 'grid',
+      buyerCart: [],  // Array of { card, quantity }
 
       // ========== INIT ==========
       async init() {
         this.setupEventListeners();
+        this.setupCartListeners();
 
         // Allow overriding sheet ID from URL param
         const params = new URLSearchParams(window.location.search);
@@ -706,8 +988,12 @@
             imageHTML = `<div class="card-placeholder">${this.esc(card.name)}</div>`;
           }
 
+          const inCart = this.buyerCart.find(i => this._cardKey(i.card) === this._cardKey(card));
+          const addedClass = inCart ? ' added' : '';
+
           tile.innerHTML = `
             ${imageHTML}
+            <button class="card-tile-add${addedClass}" title="Add to wishlist">${inCart ? '✓' : '+'}</button>
             ${card.quantity > 1 ? `<div class="card-tile-qty">x${card.quantity}</div>` : ''}
             ${variantLabel ? `<div class="card-tile-variant">${this.esc(variantLabel)}</div>` : ''}
             <div class="card-tile-info">
@@ -718,6 +1004,14 @@
               </div>
             </div>
           `;
+
+          const addBtn = tile.querySelector('.card-tile-add');
+          addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.addToBuyerCart(card);
+            addBtn.textContent = '✓';
+            addBtn.classList.add('added');
+          });
 
           grid.appendChild(tile);
         }
@@ -885,6 +1179,171 @@
         if (r.includes('uncommon')) return 'var(--rarity-uncommon)';
         if (r.includes('special')) return 'var(--rarity-special)';
         return 'var(--rarity-common)';
+      },
+
+      // ========== BUYER CART ==========
+      _cardKey(card) {
+        return `${card.name}|${card.set}|${card.number}|${card.variantType}`;
+      },
+
+      addToBuyerCart(card) {
+        const key = this._cardKey(card);
+        const existing = this.buyerCart.find(i => this._cardKey(i.card) === key);
+        if (existing) {
+          if (existing.quantity < card.quantity) existing.quantity++;
+        } else {
+          this.buyerCart.push({ card, quantity: 1 });
+        }
+        this.updateCartUI();
+      },
+
+      removeBuyerCartItem(index) {
+        this.buyerCart.splice(index, 1);
+        this.updateCartUI();
+        this.render(); // refresh add buttons
+      },
+
+      updateBuyerCartQty(index, delta) {
+        const item = this.buyerCart[index];
+        if (!item) return;
+        const newQty = item.quantity + delta;
+        if (newQty <= 0) {
+          this.removeBuyerCartItem(index);
+          return;
+        }
+        item.quantity = Math.min(newQty, item.card.quantity);
+        this.updateCartUI();
+      },
+
+      clearBuyerCart() {
+        this.buyerCart = [];
+        this.updateCartUI();
+        this.render();
+      },
+
+      updateCartUI() {
+        const toggle = document.getElementById('buyer-cart-toggle');
+        const badge = document.getElementById('buyer-cart-badge');
+        const body = document.getElementById('buyer-cart-body');
+        const totalEl = document.getElementById('buyer-cart-total');
+        const copiedMsg = document.getElementById('cart-copied-msg');
+
+        copiedMsg.style.display = 'none';
+
+        const totalItems = this.buyerCart.reduce((s, i) => s + i.quantity, 0);
+        badge.textContent = totalItems;
+        toggle.hidden = this.buyerCart.length === 0;
+
+        if (this.buyerCart.length === 0) {
+          body.innerHTML = '<div class="cart-panel-empty">Click the + button on cards to add them here.</div>';
+          totalEl.textContent = '$0.00';
+          return;
+        }
+
+        body.innerHTML = '';
+        let totalPrice = 0;
+
+        this.buyerCart.forEach((item, i) => {
+          const card = item.card;
+          const lineTotal = card.marketPrice * item.quantity;
+          totalPrice += lineTotal;
+          const variantLabel = card.variantType && card.variantType !== 'Normal' ? card.variantType : '';
+
+          const div = document.createElement('div');
+          div.className = 'cart-item';
+          div.innerHTML = `
+            ${card.frontArt ? `<img class="cart-item-img" src="${this.esc(card.frontArt)}" alt="" onerror="this.style.display='none'">` : ''}
+            <div class="cart-item-info">
+              <div class="cart-item-name">${this.esc(card.name)}${card.subtitle ? ' — ' + this.esc(card.subtitle) : ''}</div>
+              <div class="cart-item-meta">${this.esc(card.set)} #${card.number}${variantLabel ? ' | ' + this.esc(variantLabel) : ''}</div>
+              <div class="cart-item-price">$${card.marketPrice.toFixed(2)}${item.quantity > 1 ? ' × ' + item.quantity + ' = $' + lineTotal.toFixed(2) : ''}</div>
+            </div>
+            <div class="cart-item-qty">
+              <button class="cart-qty-minus" data-idx="${i}">−</button>
+              <span>${item.quantity}</span>
+              <button class="cart-qty-plus" data-idx="${i}">+</button>
+            </div>
+            <button class="cart-item-remove" data-idx="${i}">✕</button>
+          `;
+          body.appendChild(div);
+        });
+
+        // Wire buttons
+        body.querySelectorAll('.cart-qty-minus').forEach(btn =>
+          btn.addEventListener('click', () => this.updateBuyerCartQty(parseInt(btn.dataset.idx), -1))
+        );
+        body.querySelectorAll('.cart-qty-plus').forEach(btn =>
+          btn.addEventListener('click', () => this.updateBuyerCartQty(parseInt(btn.dataset.idx), 1))
+        );
+        body.querySelectorAll('.cart-item-remove').forEach(btn =>
+          btn.addEventListener('click', () => this.removeBuyerCartItem(parseInt(btn.dataset.idx)))
+        );
+
+        totalEl.textContent = `$${totalPrice.toFixed(2)}`;
+      },
+
+      openCartPanel() {
+        document.getElementById('buyer-cart-panel').classList.add('open');
+        document.getElementById('buyer-cart-overlay').classList.add('open');
+      },
+
+      closeCartPanel() {
+        document.getElementById('buyer-cart-panel').classList.remove('open');
+        document.getElementById('buyer-cart-overlay').classList.remove('open');
+      },
+
+      async copyWishlist() {
+        const buyerName = document.getElementById('buyer-name').value.trim() || 'A buyer';
+        const lines = [];
+        lines.push('--- SWU WISHLIST ---');
+        lines.push(`From: ${buyerName}`);
+        lines.push(`Date: ${new Date().toLocaleDateString()}`);
+        lines.push('');
+        lines.push('Name | Subtitle | Set | # | Variant | Qty | Price');
+        lines.push('---|---|---|---|---|---|---');
+
+        let total = 0;
+        for (const item of this.buyerCart) {
+          const c = item.card;
+          const lineTotal = c.marketPrice * item.quantity;
+          total += lineTotal;
+          lines.push([
+            c.name,
+            c.subtitle || '',
+            c.set,
+            c.number,
+            (c.variantType && c.variantType !== 'Normal') ? c.variantType : 'Normal',
+            item.quantity,
+            '$' + c.marketPrice.toFixed(2)
+          ].join(' | '));
+        }
+
+        lines.push('');
+        lines.push(`TOTAL: $${total.toFixed(2)} (${this.buyerCart.reduce((s,i) => s + i.quantity, 0)} cards)`);
+        lines.push('--- END WISHLIST ---');
+
+        const text = lines.join('\n');
+        try {
+          await navigator.clipboard.writeText(text);
+          const msg = document.getElementById('cart-copied-msg');
+          msg.style.display = 'block';
+          setTimeout(() => { msg.style.display = 'none'; }, 4000);
+        } catch (err) {
+          // Fallback: show text in a prompt
+          prompt('Copy this text and send it to the seller:', text);
+        }
+      },
+
+      setupCartListeners() {
+        document.getElementById('buyer-cart-toggle').addEventListener('click', () => this.openCartPanel());
+        document.getElementById('buyer-cart-close').addEventListener('click', () => this.closeCartPanel());
+        document.getElementById('buyer-cart-overlay').addEventListener('click', () => this.closeCartPanel());
+        document.getElementById('btn-copy-wishlist').addEventListener('click', () => this.copyWishlist());
+        document.getElementById('btn-clear-wishlist').addEventListener('click', () => {
+          if (this.buyerCart.length === 0) return;
+          this.clearBuyerCart();
+          this.closeCartPanel();
+        });
       },
     };
 

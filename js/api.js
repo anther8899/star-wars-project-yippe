@@ -456,7 +456,7 @@ SWU.API = {
       name: apiCard.Name || '',
       subtitle: apiCard.Subtitle || '',
       set: apiCard.Set || '',
-      number: apiCard.Number || '',
+      number: (apiCard.Number || '').replace(/[A-Za-z]+$/, ''),
       type: apiCard.Type || '',
       rarity: apiCard.Rarity || '',
       aspects: apiCard.Aspects || [],

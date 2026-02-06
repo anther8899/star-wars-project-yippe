@@ -169,6 +169,16 @@
           </label>
         </div>
 
+        <div id="order-import-section" style="margin-bottom:16px">
+          <h4>Import Buyer Wishlist</h4>
+          <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px">Paste a wishlist from a buyer and it will auto-add matching cards to your cart.</p>
+          <textarea id="order-import-text" rows="5" placeholder="Paste the buyer's wishlist here..." style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:10px;font-family:var(--font-main);font-size:0.8rem;resize:vertical"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="btn-import-wishlist" class="btn-primary" style="padding:6px 16px;font-size:0.8rem">Import Wishlist</button>
+            <span id="import-wishlist-status" style="font-size:0.8rem;align-self:center"></span>
+          </div>
+        </div>
+
         <div id="order-search-section">
           <h4>Search Your Collection</h4>
           <div class="search-bar">

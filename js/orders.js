@@ -134,6 +134,12 @@ SWU.Orders = {
         helpToggle.textContent = helpBlock.hidden ? 'Show Setup Guide' : 'Hide Setup Guide';
       });
     }
+
+    // Import wishlist
+    const importBtn = document.getElementById('btn-import-wishlist');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => this.importBuyerWishlist());
+    }
   },
 
   // ==========================================
@@ -475,6 +481,160 @@ SWU.Orders = {
     this.refreshHistory();
 
     SWU.App.showToast(`Order completed for ${this._buyerName}! Excel downloaded & copied to clipboard.`, 'success', 4000);
+  },
+
+  // ==========================================
+  // Import Buyer Wishlist
+  // ==========================================
+
+  async importBuyerWishlist() {
+    const textarea = document.getElementById('order-import-text');
+    const statusEl = document.getElementById('import-wishlist-status');
+    const raw = textarea.value.trim();
+
+    if (!raw) {
+      statusEl.textContent = 'Paste a wishlist first.';
+      statusEl.style.color = 'var(--accent-red)';
+      return;
+    }
+
+    statusEl.textContent = 'Importing...';
+    statusEl.style.color = 'var(--text-secondary)';
+
+    // Parse the wishlist text
+    const wishlistItems = this._parseWishlist(raw);
+
+    if (wishlistItems.length === 0) {
+      statusEl.textContent = 'Could not parse any items from the text.';
+      statusEl.style.color = 'var(--accent-red)';
+      return;
+    }
+
+    // Extract buyer name if present
+    const buyerMatch = raw.match(/From:\s*(.+)/i);
+    if (buyerMatch && buyerMatch[1].trim()) {
+      const buyerInput = document.getElementById('order-buyer-name');
+      buyerInput.value = buyerMatch[1].trim();
+      this._buyerName = buyerMatch[1].trim();
+    }
+
+    // Load all collection cards for matching
+    this._allCollectionCards = await SWU.DB.getAllCards();
+
+    let matched = 0;
+    let notFound = [];
+    let insufficientStock = [];
+
+    for (const wish of wishlistItems) {
+      // Find matching card in collection
+      const card = this._findMatchingCard(wish);
+
+      if (!card) {
+        notFound.push(wish.name + (wish.variant && wish.variant !== 'Normal' ? ` (${wish.variant})` : ''));
+        continue;
+      }
+
+      const availQty = this._getAvailableQty(card);
+      const wantQty = Math.min(wish.quantity, availQty);
+
+      if (availQty <= 0) {
+        insufficientStock.push(`${wish.name} (need ${wish.quantity}, have 0 available)`);
+        continue;
+      }
+
+      if (wantQty < wish.quantity) {
+        insufficientStock.push(`${wish.name} (need ${wish.quantity}, only ${availQty} available — added ${wantQty})`);
+      }
+
+      this.addToCart(card, wantQty);
+      matched++;
+    }
+
+    // Build status message
+    const parts = [`${matched} of ${wishlistItems.length} items added to cart.`];
+    if (notFound.length > 0) {
+      parts.push(`\nNot found: ${notFound.join(', ')}`);
+    }
+    if (insufficientStock.length > 0) {
+      parts.push(`\nStock issues: ${insufficientStock.join(', ')}`);
+    }
+
+    statusEl.innerHTML = parts.join('<br>');
+    statusEl.style.color = matched === wishlistItems.length ? 'var(--accent-green)' : 'var(--accent-gold)';
+
+    // Clear textarea on full success
+    if (matched === wishlistItems.length && notFound.length === 0) {
+      textarea.value = '';
+    }
+
+    SWU.App.showToast(`Imported ${matched} items from wishlist.`, matched > 0 ? 'success' : 'error');
+  },
+
+  _parseWishlist(text) {
+    const items = [];
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip header lines, empty lines, separators, and metadata
+      if (!trimmed) continue;
+      if (trimmed.startsWith('---')) continue;
+      if (trimmed.startsWith('From:')) continue;
+      if (trimmed.startsWith('Date:')) continue;
+      if (trimmed.startsWith('TOTAL:')) continue;
+      if (trimmed.match(/^Name\s*\|/i)) continue;
+      if (trimmed.match(/^-+\|/)) continue;
+
+      // Parse pipe-delimited format: Name | Subtitle | Set | # | Variant | Qty | Price
+      const parts = trimmed.split('|').map(p => p.trim());
+      if (parts.length >= 5) {
+        const name = parts[0];
+        const subtitle = parts[1] || '';
+        const set = parts[2] || '';
+        const number = parts[3] || '';
+        const variant = parts[4] || 'Normal';
+        const qty = parseInt(parts[5]) || 1;
+
+        if (name && name !== 'Name') {
+          items.push({ name, subtitle, set, number, variant, quantity: qty });
+        }
+      }
+    }
+
+    return items;
+  },
+
+  _findMatchingCard(wish) {
+    // Try exact match first: name + set + number + variant
+    let match = this._allCollectionCards.find(c =>
+      c.name.toLowerCase() === wish.name.toLowerCase() &&
+      c.set.toLowerCase() === wish.set.toLowerCase() &&
+      String(c.number) === String(wish.number) &&
+      (c.variantType || 'Normal').toLowerCase() === (wish.variant || 'Normal').toLowerCase()
+    );
+    if (match) return match;
+
+    // Try without variant (in case variant labels differ)
+    match = this._allCollectionCards.find(c =>
+      c.name.toLowerCase() === wish.name.toLowerCase() &&
+      c.set.toLowerCase() === wish.set.toLowerCase() &&
+      String(c.number) === String(wish.number)
+    );
+    if (match) return match;
+
+    // Try name + set only
+    match = this._allCollectionCards.find(c =>
+      c.name.toLowerCase() === wish.name.toLowerCase() &&
+      c.set.toLowerCase() === wish.set.toLowerCase()
+    );
+    if (match) return match;
+
+    // Last resort: name only
+    match = this._allCollectionCards.find(c =>
+      c.name.toLowerCase() === wish.name.toLowerCase()
+    );
+    return match || null;
   },
 
   // ==========================================

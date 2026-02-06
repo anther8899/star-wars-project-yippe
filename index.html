@@ -628,8 +628,20 @@
       #view-toggle { margin-left: 0; align-self: stretch; }
       .view-btn { flex: 1; text-align: center; }
       #grid-view { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+      /* Always show add button on mobile (no hover) */
+      .card-tile-add { opacity: 0.85; width: 32px; height: 32px; font-size: 1.2rem; }
+      /* Cart panel full-width on mobile */
       #buyer-cart-panel { width: 100%; max-width: 100vw; right: -100%; }
       #buyer-cart-toggle { bottom: 12px; right: 12px; padding: 10px 16px; font-size: 0.85rem; }
+      /* Bigger touch targets in cart */
+      .cart-item-qty button { width: 34px; height: 34px; font-size: 1.1rem; }
+      .cart-item-remove { font-size: 1.2rem; padding: 8px; }
+      .btn-copy-wishlist { padding: 14px; font-size: 1rem; }
+    }
+
+    /* Touch device support — always show add button */
+    @media (hover: none) {
+      .card-tile-add { opacity: 0.85; }
     }
 
     @media (min-width: 768px) {

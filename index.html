@@ -3,549 +3,876 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SWU Card Scanner</title>
-  <link rel="stylesheet" href="css/styles.css?v=13">
-  <!-- SheetJS for Excel export (~30KB) -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+  <title>SWU Collection — For Sale</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    /* === Custom Properties === */
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #1a1a2e;
+      --bg-card: #16213e;
+      --bg-input: #0f3460;
+      --bg-hover: #1f2b4d;
+      --text-primary: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666;
+      --accent-gold: #f5c518;
+      --accent-blue: #4fc3f7;
+      --accent-red: #e53935;
+      --accent-green: #66bb6a;
+      --border-color: #2a2a4a;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.7);
+      --radius: 8px;
+      --radius-sm: 4px;
+      --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --rarity-common: #b0b0b0;
+      --rarity-uncommon: #66bb6a;
+      --rarity-rare: #4fc3f7;
+      --rarity-legendary: #f5c518;
+      --rarity-special: #ce93d8;
+    }
+
+    /* === Reset & Base === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-main);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a5a; }
+
+    /* === Header === */
+    #app-header {
+      background: var(--bg-secondary);
+      border-bottom: 2px solid var(--accent-gold);
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .app-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .title-accent { color: var(--accent-gold); }
+
+    #collection-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .stat-divider { color: var(--text-muted); }
+    #total-cards { color: var(--text-primary); }
+    #unique-cards { color: var(--text-secondary); }
+    #total-value { color: var(--accent-green); }
+    #filtered-count { color: var(--accent-blue); font-size: 0.85rem; }
+
+    /* === Controls === */
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #controls input[type="text"],
+    #controls select {
+      font-family: var(--font-main);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #controls input[type="text"]:focus,
+    #controls select:focus {
+      border-color: var(--accent-blue);
+    }
+
+    #search { flex: 1; min-width: 180px; }
+    #controls select { cursor: pointer; min-width: 110px; }
+
+    #view-toggle {
+      display: flex;
+      gap: 0;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      margin-left: auto;
+    }
+
+    .view-btn {
+      padding: 7px 12px;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: none;
+      border-radius: 0;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: background 0.15s;
+    }
+
+    .view-btn.active {
+      background: var(--accent-gold);
+      color: #111;
+    }
+
+    .view-btn:hover:not(.active) {
+      background: var(--bg-hover);
+    }
+
+    /* === Main === */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* === Loading & Error === */
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--accent-gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error {
+      text-align: center;
+      padding: 40px 20px;
+      background: rgba(229, 57, 53, 0.1);
+      border: 1px solid var(--accent-red);
+      border-radius: var(--radius);
+      color: var(--accent-red);
+      margin-top: 16px;
+    }
+
+    /* === Grid View === */
+    #grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .card-tile {
+      position: relative;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.2s;
+      border-left: 3px solid var(--rarity-common);
+    }
+
+    .card-tile:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .card-tile.rarity-common { border-left-color: var(--rarity-common); }
+    .card-tile.rarity-uncommon { border-left-color: var(--rarity-uncommon); }
+    .card-tile.rarity-rare { border-left-color: var(--rarity-rare); }
+    .card-tile.rarity-legendary { border-left-color: var(--rarity-legendary); }
+    .card-tile.rarity-special { border-left-color: var(--rarity-special); }
+
+    .card-tile-image {
+      width: 100%;
+      aspect-ratio: 63/88;
+      object-fit: cover;
+      display: block;
+    }
+
+    .card-placeholder {
+      width: 100%;
+      aspect-ratio: 63/88;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .card-tile-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+      padding: 30px 8px 8px;
+    }
+
+    .card-tile-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-tile-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .card-tile-price { color: var(--accent-green); }
+
+    .card-tile-qty {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(0, 0, 0, 0.75);
+      color: var(--accent-gold);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      min-width: 22px;
+      text-align: center;
+    }
+
+    .card-tile-variant {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(206, 147, 216, 0.85);
+      color: #111;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* === Table View === */
+    #table-view { margin-top: 16px; overflow-x: auto; }
+
+    #collection-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    #collection-table thead th {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.5px;
+      padding: 10px 8px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+      cursor: pointer;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    #collection-table thead th:hover { color: var(--accent-gold); }
+
+    #collection-table tbody tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: background 0.15s;
+    }
+
+    #collection-table tbody tr:nth-child(even) {
+      background: rgba(22, 33, 62, 0.3);
+    }
+
+    #collection-table tbody tr:hover { background: var(--bg-hover); }
+
+    #collection-table td {
+      padding: 6px 8px;
+      vertical-align: middle;
+    }
+
+    .table-card-img {
+      width: 40px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 3px;
+    }
+
+    .table-rarity {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* === Empty State === */
+    #empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    /* === Footer === */
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border-color);
+      margin-top: 40px;
+    }
+
+    /* === Responsive === */
+    @media (max-width: 600px) {
+      .app-title { font-size: 1.1rem; }
+      .header-top { flex-direction: column; align-items: flex-start; }
+      #controls { flex-direction: column; align-items: stretch; }
+      #search { min-width: 100%; }
+      #controls select { min-width: 100%; }
+      #view-toggle { margin-left: 0; align-self: stretch; }
+      .view-btn { flex: 1; text-align: center; }
+      #grid-view { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    }
+
+    @media (min-width: 768px) {
+      #grid-view { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    }
+
+    @media (min-width: 1024px) {
+      #grid-view { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+    }
+  </style>
 </head>
 <body>
   <header id="app-header">
-    <h1 class="app-title">SWU <span class="title-accent">Card Scanner</span></h1>
-    <nav id="tab-nav">
-      <button data-tab="scan" class="tab-btn active">Scan</button>
-      <button data-tab="collection" class="tab-btn">Collection</button>
-      <button data-tab="orders" class="tab-btn">Orders</button>
-      <button data-tab="export" class="tab-btn">Export</button>
-    </nav>
+    <div class="header-top">
+      <h1 class="app-title">SWU <span class="title-accent">Collection</span></h1>
+      <div id="collection-stats">
+        <span id="total-cards">0 cards</span>
+        <span class="stat-divider">|</span>
+        <span id="unique-cards">0 unique</span>
+        <span class="stat-divider">|</span>
+        <span id="total-value">$0.00</span>
+        <span id="filtered-count"></span>
+      </div>
+    </div>
+    <div id="controls">
+      <input id="search" type="text" placeholder="Search cards...">
+      <select id="filter-rarity">
+        <option value="">All Rarities</option>
+        <option value="Common">Common</option>
+        <option value="Uncommon">Uncommon</option>
+        <option value="Rare">Rare</option>
+        <option value="Legendary">Legendary</option>
+        <option value="Special">Special</option>
+      </select>
+      <select id="filter-set">
+        <option value="">All Sets</option>
+      </select>
+      <select id="filter-aspect">
+        <option value="">All Aspects</option>
+      </select>
+      <select id="filter-type">
+        <option value="">All Types</option>
+      </select>
+      <select id="sort-by">
+        <option value="name-asc">Name A-Z</option>
+        <option value="name-desc">Name Z-A</option>
+        <option value="price-desc">Price High-Low</option>
+        <option value="price-asc">Price Low-High</option>
+        <option value="set-asc">Set</option>
+        <option value="rarity-desc">Rarity (Legendary First)</option>
+      </select>
+      <div id="view-toggle">
+        <button id="view-grid" class="view-btn active">Grid</button>
+        <button id="view-list" class="view-btn">Table</button>
+      </div>
+    </div>
   </header>
 
   <main>
-    <!-- ==================== SCAN TAB ==================== -->
-    <section id="tab-scan" class="tab-panel active">
-      <div id="scan-controls">
-        <div id="scan-mode-toggle">
-          <button id="mode-single" class="mode-btn active">Single Card</button>
-          <button id="mode-binder" class="mode-btn">Binder Page (3&times;3)</button>
-        </div>
-        <div id="camera-buttons">
-          <button id="btn-start-camera" class="btn-primary">Start Camera</button>
-          <button id="btn-stop-camera" class="btn-secondary" hidden>Stop Camera</button>
-        </div>
-      </div>
+    <div id="loading">
+      <div class="spinner"></div>
+      <p>Loading collection...</p>
+    </div>
 
-      <div id="camera-container" hidden>
-        <video id="camera-preview" autoplay playsinline muted></video>
-        <canvas id="capture-canvas"></canvas>
-        <div id="camera-overlay"></div>
-      </div>
+    <div id="error" hidden>
+      <p id="error-text"></p>
+    </div>
 
-      <div id="capture-controls" hidden>
-        <button id="btn-capture" class="btn-primary btn-large">Capture</button>
-        <button id="btn-auto-scan" class="btn-secondary">Auto-Scan</button>
-        <button id="btn-flip-camera" class="btn-secondary">Flip Camera</button>
-      </div>
+    <div id="empty-state" hidden>
+      <p>No cards match your filters.</p>
+    </div>
 
-      <div id="auto-scan-indicator" hidden>
-        <div class="auto-scan-pulse"></div>
-        <span id="auto-scan-indicator-text">Watching for card...</span>
-      </div>
+    <div id="grid-view"></div>
 
-      <div id="scan-status" hidden>
-        <div class="spinner"></div>
-        <p id="scan-status-text">Processing...</p>
-      </div>
-
-      <div id="camera-error" hidden>
-        <p id="camera-error-text"></p>
-      </div>
-
-      <div id="catalog-status" hidden>
-        <div class="spinner spinner-small"></div>
-        <span id="catalog-status-text">Loading card database...</span>
-      </div>
-
-      <div id="manual-search">
-        <div id="search-header">
-          <h3>Manual Search</h3>
-          <label id="quick-add-toggle">
-            <input type="checkbox" id="chk-quick-add" checked>
-            <span class="toggle-label">Quick Add</span>
-          </label>
-        </div>
-        <div class="search-bar">
-          <input id="search-input" type="text" placeholder="Type card name... (results appear instantly)" autocomplete="off">
-          <button id="btn-search" class="btn-primary">Search</button>
-        </div>
-        <div id="quick-add-banner" hidden>
-          <span id="session-add-count">0</span> cards added this session
-          <button id="btn-reset-session" class="btn-secondary" style="padding:2px 8px;font-size:0.7rem;margin-left:8px">Reset</button>
-        </div>
-        <div id="search-results"></div>
-      </div>
-    </section>
-
-    <!-- ==================== COLLECTION TAB ==================== -->
-    <section id="tab-collection" class="tab-panel">
-      <div id="collection-header">
-        <div id="collection-stats">
-          <span id="total-cards-count">0 cards</span>
-          <span class="stat-divider">|</span>
-          <span id="total-value">$0.00</span>
-        </div>
-        <div id="collection-controls">
-          <div id="view-toggle">
-            <button id="view-grid" class="view-btn active" title="Grid view">&#9638;</button>
-            <button id="view-list" class="view-btn" title="List view">&#9776;</button>
-          </div>
-          <input id="collection-filter" type="text" placeholder="Filter collection...">
-          <select id="collection-sort">
-            <option value="dateAdded-desc">Newest First</option>
-            <option value="dateAdded-asc">Oldest First</option>
-            <option value="name-asc">Name A-Z</option>
-            <option value="name-desc">Name Z-A</option>
-            <option value="price-desc">Price High-Low</option>
-            <option value="price-asc">Price Low-High</option>
-            <option value="set-asc">Set</option>
-            <option value="rarity-desc">Rarity</option>
-          </select>
-          <button id="btn-needs-price" class="btn-price-check" title="Show cards that need a price check">Needs Price Check <span id="price-check-count" class="badge">0</span></button>
-        </div>
-      </div>
-
-      <div id="collection-empty" hidden>
-        <p>No cards in your collection yet. Head to the <strong>Scan</strong> tab to get started!</p>
-      </div>
-
-      <div id="collection-grid" class="collection-view active"></div>
-
-      <div id="collection-table-wrap" class="collection-view" hidden>
-        <table id="collection-table">
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th data-sort="name">Name</th>
-              <th data-sort="set">Set</th>
-              <th data-sort="number">Number</th>
-              <th data-sort="rarity">Rarity</th>
-              <th data-sort="type">Type</th>
-              <th data-sort="quantity">Qty</th>
-              <th data-sort="marketPrice">Market $</th>
-              <th data-sort="customPrice">Custom $</th>
-              <th data-sort="totalValue">Total $</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="collection-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ==================== ORDERS TAB ==================== -->
-    <section id="tab-orders" class="tab-panel">
-
-      <!-- New Order / Cart -->
-      <div class="export-section">
-        <h3>New Order</h3>
-
-        <div id="order-buyer-row">
-          <label>Buyer Name:
-            <input id="order-buyer-name" type="text" placeholder="Enter buyer's name...">
-          </label>
-        </div>
-
-        <div id="order-discount-row">
-          <label>Discount:
-            <select id="order-discount">
-              <option value="75">75% of Market (25% off)</option>
-              <option value="80">80% of Market (20% off)</option>
-              <option value="90">90% of Market (10% off)</option>
-              <option value="100">Full Market Price</option>
-              <option value="custom">Custom...</option>
-            </select>
-          </label>
-          <label id="order-custom-discount-label" hidden>
-            Custom %:
-            <input id="order-custom-discount" type="number" min="1" max="100" value="75" step="1">
-          </label>
-        </div>
-
-        <div id="order-search-section">
-          <h4>Search Your Collection</h4>
-          <div class="search-bar">
-            <input id="order-search-input" type="text" placeholder="Search cards in your collection..." autocomplete="off">
-            <button id="btn-order-search" class="btn-primary">Search</button>
-          </div>
-          <div id="order-search-results"></div>
-        </div>
-      </div>
-
-      <!-- Cart Display -->
-      <div class="export-section" id="order-cart-display">
-        <h3>Cart <span id="cart-item-count">(0 items)</span></h3>
-        <div id="order-cart-empty">
-          <p style="color:var(--text-secondary)">Search for cards above and add them to the cart.</p>
-        </div>
-        <div id="order-cart-table-wrap" hidden>
-          <table id="order-cart-table">
-            <thead>
-              <tr>
-                <th>Card</th>
-                <th>Variant</th>
-                <th>Set</th>
-                <th>Avail</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Disc.</th>
-                <th>Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="order-cart-body"></tbody>
-            <tfoot>
-              <tr id="order-cart-totals">
-                <td colspan="7" style="text-align:right;font-weight:700">Order Total:</td>
-                <td id="order-cart-total-amount" style="font-weight:700;color:var(--accent-green)">$0.00</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <div id="order-actions" hidden>
-          <button id="btn-complete-order" class="btn-primary btn-large">Complete Order</button>
-          <button id="btn-clear-cart" class="btn-secondary">Clear Cart</button>
-          <button id="btn-copy-cart" class="btn-secondary">Copy to Clipboard</button>
-        </div>
-      </div>
-
-      <!-- Sales History -->
-      <div class="export-section">
-        <h3>Sales History</h3>
-        <div id="order-history-stats">
-          <span id="total-orders-count">0 orders</span>
-          <span class="stat-divider">|</span>
-          <span id="total-sales-amount">$0.00</span>
-        </div>
-        <div id="order-history-list"></div>
-        <div id="order-history-empty" hidden>
-          <p style="color:var(--text-secondary)">No orders yet. Complete your first sale above!</p>
-        </div>
-        <div id="order-history-actions" hidden>
-          <button id="btn-export-all-orders" class="btn-primary">Export All Orders (Excel)</button>
-          <button id="btn-export-orders-json" class="btn-secondary">Export Orders (JSON)</button>
-        </div>
-      </div>
-
-      <!-- Google Sheets Sync -->
-      <div class="export-section">
-        <h3>Google Sheets Sync</h3>
-        <p>Sync orders to your Google Sheet. Set up a Google Apps Script endpoint, paste the URL below, and orders will auto-sync on completion. You can also use "Copy to Clipboard" on any order to paste directly into Sheets.</p>
-        <div id="gsheet-config">
-          <input id="gsheet-url" type="text" placeholder="Google Apps Script Web App URL..." style="width:100%;margin-bottom:8px">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button id="btn-save-gsheet-url" class="btn-secondary">Save URL</button>
-            <button id="btn-test-gsheet" class="btn-secondary">Test Connection</button>
-            <span id="gsheet-status"></span>
-          </div>
-        </div>
-        <div style="margin-top:12px">
-          <button id="btn-toggle-gsheet-help" class="btn-secondary" style="font-size:0.75rem;padding:4px 10px">Show Setup Guide</button>
-          <div id="gsheet-help-block" hidden style="margin-top:10px">
-            <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px">1. Open your Google Sheet &rarr; Extensions &rarr; Apps Script<br>2. Paste this code and save:<br>3. Deploy &rarr; New deployment &rarr; Web app &rarr; "Anyone" &rarr; Deploy<br>4. Copy the URL and paste it above.</p>
-            <pre style="background:var(--bg-primary);color:var(--accent-blue);padding:12px;border-radius:var(--radius-sm);font-size:0.7rem;overflow-x:auto;white-space:pre;max-height:260px;overflow-y:auto">function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Orders');
-  if (!sheet) {
-    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('Orders');
-    sheet.appendRow(['Date', 'Buyer', 'Card', 'Subtitle', 'Set',
-      'Number', 'Variant', 'Qty', 'Market $', 'Discounted $', 'Line Total']);
-  }
-
-  var data = JSON.parse(e.postData.contents);
-
-  if (data.action === 'test') {
-    sheet.appendRow(['TEST', new Date().toISOString(), 'Connection OK']);
-    return ContentService.createTextOutput('OK');
-  }
-
-  var items = data.items || [];
-  for (var i = 0; i &lt; items.length; i++) {
-    var item = items[i];
-    sheet.appendRow([
-      data.date, data.buyerName, item.name, item.subtitle,
-      item.set, item.number, item.variant, item.qty,
-      item.price, item.discounted, item.lineTotal
-    ]);
-  }
-
-  return ContentService.createTextOutput('OK');
-}</pre>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== EXPORT TAB ==================== -->
-    <section id="tab-export" class="tab-panel">
-      <div class="export-section">
-        <h3>Export Collection</h3>
-        <p>Download your collection data for use in spreadsheets or as a backup.</p>
-        <div class="export-options">
-          <label>Sort by:
-            <select id="export-sort">
-              <option value="name-asc">Name A-Z</option>
-              <option value="name-desc">Name Z-A</option>
-              <option value="price-desc">Price High-Low</option>
-              <option value="price-asc">Price Low-High</option>
-              <option value="set-asc">Set</option>
-              <option value="rarity-desc">Rarity (Legendary first)</option>
-              <option value="aspect-asc">Aspect</option>
-              <option value="type-asc">Type</option>
-              <option value="dateAdded-desc">Newest First</option>
-            </select>
-          </label>
-        </div>
-        <div class="export-buttons">
-          <button id="btn-export-excel" class="btn-primary">Export as Excel</button>
-          <button id="btn-export-ff" class="btn-primary" style="background:var(--accent-blue)">Export Friends &amp; Family (75%)</button>
-          <button id="btn-export-json" class="btn-secondary">Export as JSON (Backup)</button>
-        </div>
-      </div>
-
-      <div class="export-section">
-        <h3>Sync to Google Sheet</h3>
-        <p>Push your entire collection to your Google Sheet. This <strong>replaces all data</strong> in the sheet with your current collection.</p>
-        <div class="export-options">
-          <label>Discount:
-            <select id="sync-discount">
-              <option value="75" selected>75% of Market</option>
-              <option value="80">80% of Market</option>
-              <option value="90">90% of Market</option>
-              <option value="100">100% (Full Market)</option>
-            </select>
-          </label>
-          <label>Sort by:
-            <select id="sync-sort">
-              <option value="name-asc">Name A-Z</option>
-              <option value="name-desc">Name Z-A</option>
-              <option value="price-desc">Price High-Low</option>
-              <option value="price-asc">Price Low-High</option>
-              <option value="set-asc">Set</option>
-              <option value="rarity-desc">Rarity (Legendary first)</option>
-              <option value="aspect-asc">Aspect</option>
-              <option value="type-asc">Type</option>
-              <option value="dateAdded-desc">Newest First</option>
-            </select>
-          </label>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-          <button id="btn-sync-collection-sheet" class="btn-primary" style="background:var(--accent-blue)">Sync to Google Sheet</button>
-          <span id="sync-collection-status"></span>
-        </div>
-        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Requires a Google Apps Script URL (set up in Orders tab &rarr; Google Sheets Sync).</p>
-        <div style="margin-top:10px">
-          <button id="btn-toggle-sync-help" class="btn-secondary" style="font-size:0.75rem;padding:4px 10px">Show Apps Script Code</button>
-          <div id="sync-help-block" hidden style="margin-top:10px">
-            <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px">Update your Apps Script with this code. It handles both <strong>orders</strong> and <strong>collection sync</strong>. Re-deploy after updating.</p>
-            <pre style="background:var(--bg-primary);color:var(--accent-blue);padding:12px;border-radius:var(--radius-sm);font-size:0.7rem;overflow-x:auto;white-space:pre;max-height:340px;overflow-y:auto">function doPost(e) {
-  var data = JSON.parse(e.postData.contents);
-
-  // === TEST ===
-  if (data.action === 'test') {
-    var s = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-    s.appendRow(['TEST', new Date().toISOString(), 'Connection OK']);
-    return ContentService.createTextOutput('OK');
-  }
-
-  // === SYNC COLLECTION (full replace) ===
-  if (data.action === 'syncCollection') {
-    // Uses the FIRST sheet in the spreadsheet
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-
-    // Write header if sheet is empty
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Name','Subtitle','Set','Number','Rarity',
-        'Type','Aspects','Variant Type','Quantity',
-        'Market Price','Discounted Price','','Notes','Front Art']);
-    }
-
-    // Clear all data rows (keep header row 1)
-    var lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
-    }
-
-    // Write collection rows
-    var rows = data.rows || [];
-    for (var i = 0; i &lt; rows.length; i++) {
-      var r = rows[i];
-      sheet.appendRow([
-        r.name, r.subtitle, r.set, r.number, r.rarity, r.type,
-        r.aspects, r.variantType, r.quantity,
-        '$' + r.marketPrice, '$' + r.discountedPrice, '', r.notes, r.frontArt || ''
-      ]);
-    }
-    return ContentService.createTextOutput('OK');
-  }
-
-  // === ADD ORDER (append to Orders sheet) ===
-  if (data.action === 'addOrder') {
-    var orderSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Orders');
-    if (!orderSheet) {
-      orderSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('Orders');
-      orderSheet.appendRow(['Date','Buyer','Card','Subtitle','Set',
-        'Number','Variant','Qty','Market $','Discounted $','Line Total']);
-    }
-    var items = data.items || [];
-    for (var j = 0; j &lt; items.length; j++) {
-      var item = items[j];
-      orderSheet.appendRow([
-        data.date, data.buyerName, item.name, item.subtitle,
-        item.set, item.number, item.variant, item.qty,
-        item.price, item.discounted, item.lineTotal
-      ]);
-    }
-    return ContentService.createTextOutput('OK');
-  }
-
-  return ContentService.createTextOutput('Unknown action');
-}</pre>
-          </div>
-        </div>
-      </div>
-
-      <div class="export-section">
-        <h3>Import Collection</h3>
-        <p>Import from a JSON backup file. This will <strong>merge</strong> with your existing data (duplicates are skipped).</p>
-        <div class="import-area">
-          <input type="file" id="import-file" accept=".json">
-          <button id="btn-import-json" class="btn-primary">Import JSON</button>
-        </div>
-      </div>
-
-      <div class="export-section">
-        <h3>Refresh Prices</h3>
-        <p>Update market prices for all cards in your collection from the SWU-DB API.</p>
-        <button id="btn-refresh-prices" class="btn-secondary">Refresh All Prices</button>
-        <div id="price-refresh-status" hidden>
-          <div class="spinner spinner-small"></div>
-          <span id="price-refresh-text">Refreshing...</span>
-        </div>
-      </div>
-
-      <div class="export-section">
-        <h3>Card Database</h3>
-        <p>Re-download all card data and scanner hashes. Do this when new sets are released or prices need updating.</p>
-        <button id="btn-rebuild-hashes" class="btn-secondary">Rebuild Card Database</button>
-        <div id="hash-rebuild-status" hidden>
-          <div class="spinner spinner-small"></div>
-          <span id="hash-rebuild-text">Rebuilding...</span>
-        </div>
-      </div>
-
-      <div class="export-section danger-zone">
-        <h3>Danger Zone</h3>
-        <button id="btn-clear-collection" class="btn-danger">Clear Entire Collection</button>
-      </div>
-    </section>
+    <div id="table-view" hidden>
+      <table id="collection-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th data-sort="name">Name</th>
+            <th data-sort="set">Set</th>
+            <th data-sort="number">#</th>
+            <th data-sort="rarity">Rarity</th>
+            <th data-sort="type">Type</th>
+            <th>Aspects</th>
+            <th>Variant</th>
+            <th data-sort="quantity">Qty</th>
+            <th data-sort="marketPrice">Market $</th>
+            <th data-sort="discountedPrice">Price $</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
   </main>
 
-  <!-- ==================== CARD CONFIRMATION MODAL ==================== -->
-  <dialog id="card-confirm-dialog">
-    <div class="dialog-content">
-      <h2>Confirm Card</h2>
-      <div id="dialog-card-preview">
-        <div id="dialog-card-image-wrap">
-          <img id="dialog-card-image" src="" alt="Card">
-        </div>
-        <div id="dialog-card-info">
-          <p class="info-row"><span class="info-label">OCR Text:</span> <span id="dialog-ocr-text" class="info-value ocr-text"></span></p>
-          <p class="info-row"><span class="info-label">Matched:</span> <span id="dialog-matched-name" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Subtitle:</span> <span id="dialog-subtitle" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Set:</span> <span id="dialog-set" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Number:</span> <span id="dialog-number" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Rarity:</span> <span id="dialog-rarity" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Type:</span> <span id="dialog-type" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Variant:</span> <span id="dialog-variant" class="info-value"></span></p>
-          <p class="info-row"><span class="info-label">Market Price:</span> $<span id="dialog-price" class="info-value"></span></p>
-          <p id="dialog-duplicate-notice" class="duplicate-notice" hidden>This card is already in your collection!</p>
-        </div>
-      </div>
+  <footer>
+    <p>Prices updated on each sync. Contact seller to purchase.</p>
+  </footer>
 
-      <div id="dialog-variants-section" hidden>
-        <h3>Art Variants <span id="dialog-variants-count"></span></h3>
-        <div id="dialog-variants-list"></div>
-      </div>
-      <div id="dialog-variants-loading" hidden>
-        <div class="spinner spinner-small"></div>
-        <span>Loading variants...</span>
-      </div>
-      <!-- Variants auto-load when dialog opens -->
+  <script>
+    const PV = {
+      // ========== CONFIG ==========
+      // Change this to your Google Sheet ID
+      SHEET_ID: '1obPzdu07q19l3psMZaCSSCIWGf07Kun8OVM7I2TFQaA',
 
-      <div id="dialog-alternatives" hidden>
-        <h3>Did you mean one of these?</h3>
-        <div id="dialog-alt-list"></div>
-      </div>
+      // ========== STATE ==========
+      allCards: [],
+      filteredCards: [],
+      viewMode: 'grid',
 
-      <div id="dialog-actions">
-        <label>Quantity: <input id="dialog-quantity" type="number" value="1" min="1" max="99"></label>
-        <label>Custom Price: <input id="dialog-custom-price" type="number" step="0.01" min="0" placeholder="Optional override"></label>
-        <label>Notes: <input id="dialog-notes" type="text" placeholder="Optional notes"></label>
-      </div>
+      // ========== INIT ==========
+      async init() {
+        this.setupEventListeners();
 
-      <div class="dialog-buttons">
-        <button id="btn-confirm-add" class="btn-primary">Add to Collection</button>
-        <button id="btn-confirm-skip" class="btn-secondary">Skip</button>
-        <button id="btn-confirm-retry" class="btn-secondary">Search Again</button>
-      </div>
-    </div>
-  </dialog>
+        // Allow overriding sheet ID from URL param
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('sheet')) this.SHEET_ID = params.get('sheet');
 
-  <!-- ==================== CARD EDIT MODAL ==================== -->
-  <dialog id="card-edit-dialog">
-    <div class="dialog-content">
-      <h2>Edit Card</h2>
-      <div id="edit-card-preview">
-        <img id="edit-card-image" src="" alt="Card">
-        <div id="edit-card-name"></div>
-      </div>
-      <div id="edit-fields">
-        <label>Quantity: <input id="edit-quantity" type="number" min="1" max="99"></label>
-        <label>Custom Price ($): <input id="edit-custom-price" type="number" step="0.01" min="0" placeholder="Leave blank for market price"></label>
-        <label>Notes: <textarea id="edit-notes" rows="2" placeholder="Optional notes"></textarea></label>
-      </div>
-      <div class="dialog-buttons">
-        <button id="btn-edit-save" class="btn-primary">Save</button>
-        <button id="btn-edit-delete" class="btn-danger">Remove</button>
-        <button id="btn-edit-cancel" class="btn-secondary">Cancel</button>
-      </div>
-    </div>
-  </dialog>
+        try {
+          const csvText = await this.fetchData();
+          this.allCards = this.parseCSV(csvText);
+          this.populateFilterDropdowns(this.allCards);
+          this.applyFilters();
+          document.getElementById('loading').hidden = true;
+        } catch (err) {
+          document.getElementById('loading').hidden = true;
+          document.getElementById('error').hidden = false;
+          document.getElementById('error-text').textContent =
+            'Failed to load collection: ' + err.message +
+            ' — Make sure the Google Sheet is shared as "Anyone with the link."';
+        }
+      },
 
-  <!-- ==================== BINDER PROGRESS MODAL ==================== -->
-  <dialog id="binder-progress-dialog">
-    <div class="dialog-content">
-      <h2>Processing Binder Page</h2>
-      <p>Scanning card <span id="binder-current">0</span> of <span id="binder-total">9</span></p>
-      <div class="progress-bar">
-        <div id="binder-progress-fill" class="progress-fill" style="width:0%"></div>
-      </div>
-      <div id="binder-results"></div>
-      <div class="dialog-buttons">
-        <button id="btn-binder-done" class="btn-primary" hidden>Done</button>
-        <button id="btn-binder-cancel" class="btn-secondary">Cancel</button>
-      </div>
-    </div>
-  </dialog>
+      // ========== DATA FETCHING ==========
+      async fetchData() {
+        const urls = [
+          `https://docs.google.com/spreadsheets/d/${this.SHEET_ID}/gviz/tq?tqx=out:csv`,
+          `https://docs.google.com/spreadsheets/d/${this.SHEET_ID}/pub?output=csv`,
+        ];
 
-  <!-- ==================== TOAST CONTAINER ==================== -->
-  <div id="toast-container"></div>
+        let csvText = null;
+        for (const url of urls) {
+          try {
+            const resp = await fetch(url);
+            if (resp.ok) {
+              csvText = await resp.text();
+              if (csvText && csvText.trim().length > 0) break;
+            }
+          } catch (e) { continue; }
+        }
 
-  <!-- ==================== SCRIPTS (load order matters) ==================== -->
-  <script src="js/db.js?v=13"></script>
-  <script src="js/api.js?v=13"></script>
-  <script src="js/ocr.js?v=13"></script>
-  <script src="js/camera.js?v=13"></script>
-  <script src="js/export.js?v=13"></script>
-  <script src="js/orders.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+        if (!csvText || csvText.trim().length === 0) {
+          throw new Error('Could not fetch spreadsheet data.');
+        }
+        return csvText;
+      },
+
+      // ========== CSV PARSING ==========
+      parseCSV(csvText) {
+        const result = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: h => h.trim(),
+        });
+
+        return result.data.map(row => ({
+          name:            row['Name'] || '',
+          subtitle:        row['Subtitle'] || '',
+          set:             row['Set'] || '',
+          number:          row['Number'] || '',
+          rarity:          row['Rarity'] || '',
+          type:            row['Type'] || '',
+          aspects:         row['Aspects'] || '',
+          variantType:     row['Variant Type'] || 'Normal',
+          quantity:        parseInt(row['Quantity']) || 1,
+          marketPrice:     this.parsePrice(row['Market Price']),
+          discountedPrice: this.parsePrice(row['Discounted Price']),
+          notes:           row['Notes'] || '',
+          frontArt:        row['Front Art'] || '',
+        })).filter(card => card.name.trim() !== '');
+      },
+
+      parsePrice(str) {
+        if (!str) return 0;
+        return parseFloat(String(str).replace(/[$,]/g, '')) || 0;
+      },
+
+      // ========== FILTERS & SORT ==========
+      applyFilters() {
+        const search = document.getElementById('search').value.trim().toLowerCase();
+        const rarity = document.getElementById('filter-rarity').value;
+        const set    = document.getElementById('filter-set').value;
+        const aspect = document.getElementById('filter-aspect').value;
+        const type   = document.getElementById('filter-type').value;
+
+        let cards = this.allCards;
+
+        if (search) {
+          cards = cards.filter(c =>
+            c.name.toLowerCase().includes(search) ||
+            c.subtitle.toLowerCase().includes(search) ||
+            c.set.toLowerCase().includes(search) ||
+            c.type.toLowerCase().includes(search) ||
+            c.aspects.toLowerCase().includes(search) ||
+            (c.variantType && c.variantType.toLowerCase().includes(search))
+          );
+        }
+
+        if (rarity) cards = cards.filter(c => c.rarity === rarity);
+        if (set)    cards = cards.filter(c => c.set === set);
+        if (type)   cards = cards.filter(c => c.type === type);
+        if (aspect) cards = cards.filter(c => c.aspects.includes(aspect));
+
+        cards = this.sortCards(cards);
+        this.filteredCards = cards;
+        this.render();
+        this.updateStats();
+      },
+
+      sortCards(cards) {
+        const sortVal = document.getElementById('sort-by').value;
+        const [key, dir] = sortVal.split('-');
+        const mult = dir === 'asc' ? 1 : -1;
+
+        return [...cards].sort((a, b) => {
+          switch (key) {
+            case 'name':
+              return a.name.localeCompare(b.name) * mult;
+            case 'price':
+              return ((a.discountedPrice || a.marketPrice) - (b.discountedPrice || b.marketPrice)) * mult;
+            case 'set':
+              return (a.set + String(a.number).padStart(4, '0')).localeCompare(b.set + String(b.number).padStart(4, '0')) * mult;
+            case 'rarity':
+              return (this.rarityRank(a.rarity) - this.rarityRank(b.rarity)) * mult;
+            case 'quantity':
+              return (a.quantity - b.quantity) * mult;
+            case 'marketPrice':
+              return (a.marketPrice - b.marketPrice) * mult;
+            case 'discountedPrice':
+              return ((a.discountedPrice || a.marketPrice) - (b.discountedPrice || b.marketPrice)) * mult;
+            case 'number':
+              return (parseInt(a.number) - parseInt(b.number)) * mult;
+            case 'type':
+              return a.type.localeCompare(b.type) * mult;
+            default:
+              return 0;
+          }
+        });
+      },
+
+      rarityRank(rarity) {
+        const r = (rarity || '').toLowerCase();
+        if (r.includes('common') && !r.includes('un')) return 1;
+        if (r.includes('uncommon')) return 2;
+        if (r.includes('rare') && !r.includes('legendary')) return 3;
+        if (r.includes('legendary')) return 4;
+        if (r.includes('special')) return 5;
+        return 0;
+      },
+
+      // ========== RENDERING ==========
+      render() {
+        const gridEl = document.getElementById('grid-view');
+        const tableEl = document.getElementById('table-view');
+        const emptyEl = document.getElementById('empty-state');
+
+        if (this.filteredCards.length === 0) {
+          gridEl.innerHTML = '';
+          document.getElementById('table-body').innerHTML = '';
+          emptyEl.hidden = false;
+          gridEl.style.display = 'none';
+          tableEl.hidden = true;
+          return;
+        }
+
+        emptyEl.hidden = true;
+
+        if (this.viewMode === 'grid') {
+          gridEl.style.display = 'grid';
+          tableEl.hidden = true;
+          this.renderGrid(this.filteredCards);
+        } else {
+          gridEl.style.display = 'none';
+          tableEl.hidden = false;
+          this.renderTable(this.filteredCards);
+        }
+      },
+
+      renderGrid(cards) {
+        const grid = document.getElementById('grid-view');
+        grid.innerHTML = '';
+
+        for (const card of cards) {
+          const tile = document.createElement('div');
+          const rarityClass = this.getRarityClass(card.rarity);
+          tile.className = `card-tile ${rarityClass}`;
+
+          const variantLabel = card.variantType && card.variantType !== 'Normal' ? card.variantType : '';
+          const price = card.discountedPrice || card.marketPrice;
+
+          let imageHTML;
+          if (card.frontArt) {
+            imageHTML = `<img class="card-tile-image" src="${this.esc(card.frontArt)}" alt="${this.esc(card.name)}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-placeholder\\'>${this.esc(card.name)}</div>'">`;
+          } else {
+            imageHTML = `<div class="card-placeholder">${this.esc(card.name)}</div>`;
+          }
+
+          tile.innerHTML = `
+            ${imageHTML}
+            ${card.quantity > 1 ? `<div class="card-tile-qty">x${card.quantity}</div>` : ''}
+            ${variantLabel ? `<div class="card-tile-variant">${this.esc(variantLabel)}</div>` : ''}
+            <div class="card-tile-info">
+              <div class="card-tile-name">${this.esc(card.name)}${card.subtitle ? ' — ' + this.esc(card.subtitle) : ''}</div>
+              <div class="card-tile-meta">
+                <span>${this.esc(card.set)} #${card.number}</span>
+                <span class="card-tile-price">$${price.toFixed(2)}</span>
+              </div>
+            </div>
+          `;
+
+          grid.appendChild(tile);
+        }
+      },
+
+      renderTable(cards) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+
+        for (const card of cards) {
+          const rarityColor = this.getRarityColor(card.rarity);
+          const variantLabel = card.variantType && card.variantType !== 'Normal' ? card.variantType : '';
+          const price = card.discountedPrice || card.marketPrice;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${card.frontArt
+              ? `<img class="table-card-img" src="${this.esc(card.frontArt)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+              : ''
+            }</td>
+            <td>
+              <strong>${this.esc(card.name)}</strong>
+              ${card.subtitle ? `<br><small style="color:var(--text-secondary)">${this.esc(card.subtitle)}</small>` : ''}
+              ${variantLabel ? `<br><small style="color:var(--rarity-special)">${this.esc(variantLabel)}</small>` : ''}
+            </td>
+            <td>${this.esc(card.set)}</td>
+            <td>${card.number}</td>
+            <td><span class="table-rarity" style="background:${rarityColor}"></span>${this.esc(card.rarity)}</td>
+            <td>${this.esc(card.type)}</td>
+            <td>${this.esc(card.aspects)}</td>
+            <td>${this.esc(variantLabel || 'Normal')}</td>
+            <td>${card.quantity}</td>
+            <td>$${card.marketPrice.toFixed(2)}</td>
+            <td style="color:var(--accent-green);font-weight:600">$${price.toFixed(2)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      },
+
+      // ========== STATS ==========
+      updateStats() {
+        const all = this.allCards;
+        const filtered = this.filteredCards;
+        const totalQty = all.reduce((sum, c) => sum + c.quantity, 0);
+        const uniqueCount = all.length;
+        const totalValue = all.reduce((sum, c) => sum + ((c.discountedPrice || c.marketPrice) * c.quantity), 0);
+
+        document.getElementById('total-cards').textContent = `${totalQty} cards`;
+        document.getElementById('unique-cards').textContent = `${uniqueCount} unique`;
+        document.getElementById('total-value').textContent = `$${totalValue.toFixed(2)}`;
+
+        const filteredEl = document.getElementById('filtered-count');
+        if (filtered.length < all.length) {
+          filteredEl.textContent = `(showing ${filtered.length})`;
+        } else {
+          filteredEl.textContent = '';
+        }
+      },
+
+      // ========== DYNAMIC FILTERS ==========
+      populateFilterDropdowns(cards) {
+        const sets = [...new Set(cards.map(c => c.set).filter(Boolean))].sort();
+        const types = [...new Set(cards.map(c => c.type).filter(Boolean))].sort();
+        const aspects = [...new Set(
+          cards.flatMap(c => c.aspects.split(/\s*\/\s*/).filter(Boolean))
+        )].sort();
+
+        this.populateSelect('filter-set', sets);
+        this.populateSelect('filter-type', types);
+        this.populateSelect('filter-aspect', aspects);
+      },
+
+      populateSelect(id, values) {
+        const select = document.getElementById(id);
+        while (select.options.length > 1) select.remove(1);
+        for (const val of values) {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          select.appendChild(opt);
+        }
+      },
+
+      // ========== EVENT LISTENERS ==========
+      setupEventListeners() {
+        // Search with debounce
+        let debounce = null;
+        document.getElementById('search').addEventListener('input', () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => this.applyFilters(), 200);
+        });
+
+        // Filter dropdowns + sort
+        ['filter-rarity', 'filter-set', 'filter-type', 'filter-aspect', 'sort-by'].forEach(id => {
+          document.getElementById(id).addEventListener('change', () => this.applyFilters());
+        });
+
+        // View toggle
+        document.getElementById('view-grid').addEventListener('click', () => {
+          this.viewMode = 'grid';
+          document.getElementById('view-grid').classList.add('active');
+          document.getElementById('view-list').classList.remove('active');
+          this.render();
+        });
+
+        document.getElementById('view-list').addEventListener('click', () => {
+          this.viewMode = 'table';
+          document.getElementById('view-list').classList.add('active');
+          document.getElementById('view-grid').classList.remove('active');
+          this.render();
+        });
+
+        // Sortable table headers
+        document.querySelectorAll('#collection-table th[data-sort]').forEach(th => {
+          th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            const sortSelect = document.getElementById('sort-by');
+            const current = sortSelect.value;
+            const [currentKey, currentDir] = current.split('-');
+
+            // Toggle direction if clicking same column, otherwise asc
+            const newDir = (currentKey === key && currentDir === 'asc') ? 'desc' : 'asc';
+
+            // Check if this sort option exists in the select
+            const optionVal = `${key}-${newDir}`;
+            const exists = [...sortSelect.options].some(o => o.value === optionVal);
+            if (exists) {
+              sortSelect.value = optionVal;
+            } else {
+              // For columns like quantity, number, etc. — just re-sort with custom logic
+              sortSelect.value = `${key}-${newDir}`;
+              // Add temporary option if needed
+              if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = optionVal;
+                opt.textContent = key + ' ' + newDir;
+                sortSelect.appendChild(opt);
+                sortSelect.value = optionVal;
+              }
+            }
+            this.applyFilters();
+          });
+        });
+      },
+
+      // ========== UTILITIES ==========
+      esc(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      },
+
+      getRarityClass(rarity) {
+        const r = (rarity || '').toLowerCase();
+        if (r.includes('legendary')) return 'rarity-legendary';
+        if (r.includes('rare') && !r.includes('legendary')) return 'rarity-rare';
+        if (r.includes('uncommon')) return 'rarity-uncommon';
+        if (r.includes('special')) return 'rarity-special';
+        return 'rarity-common';
+      },
+
+      getRarityColor(rarity) {
+        const r = (rarity || '').toLowerCase();
+        if (r.includes('legendary')) return 'var(--rarity-legendary)';
+        if (r.includes('rare') && !r.includes('legendary')) return 'var(--rarity-rare)';
+        if (r.includes('uncommon')) return 'var(--rarity-uncommon)';
+        if (r.includes('special')) return 'var(--rarity-special)';
+        return 'var(--rarity-common)';
+      },
+    };
+
+    document.addEventListener('DOMContentLoaded', () => PV.init());
+  </script>
 </body>
 </html>

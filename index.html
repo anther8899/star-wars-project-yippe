@@ -168,6 +168,7 @@
       padding: 60px 20px;
       color: var(--text-secondary);
     }
+    #loading[hidden] { display: none; }
 
     .spinner {
       width: 36px;
@@ -546,6 +547,10 @@
           transformHeader: h => h.trim(),
         });
 
+        // Find the Front Art column — may be named 'Front Art' or have a blank header
+        // containing image URLs (https://cdn.swu-db.com/...)
+        const artCol = this.findArtColumn(result.fields || result.meta.fields, result.data);
+
         return result.data.map(row => ({
           name:            row['Name'] || '',
           subtitle:        row['Subtitle'] || '',
@@ -559,8 +564,23 @@
           marketPrice:     this.parsePrice(row['Market Price']),
           discountedPrice: this.parsePrice(row['Discounted Price']),
           notes:           row['Notes'] || '',
-          frontArt:        row['Front Art'] || '',
+          frontArt:        artCol ? (row[artCol] || '') : (row['Front Art'] || ''),
         })).filter(card => card.name.trim() !== '');
+      },
+
+      findArtColumn(fields, data) {
+        if (!fields) return null;
+        // If 'Front Art' header exists, use it
+        if (fields.includes('Front Art')) return 'Front Art';
+        // Otherwise, scan unnamed/blank columns for image URLs
+        const sample = data.slice(0, 5);
+        for (const f of fields) {
+          if (['Name','Subtitle','Set','Number','Rarity','Type','Aspects',
+               'Variant Type','Quantity','Market Price','Discounted Price','Notes'].includes(f)) continue;
+          const hasUrl = sample.some(row => (row[f] || '').match(/^https?:\/\/.+\.(png|jpg|jpeg|webp)/i));
+          if (hasUrl) return f;
+        }
+        return null;
       },
 
       parsePrice(str) {

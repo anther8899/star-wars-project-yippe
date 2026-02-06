@@ -360,11 +360,14 @@
     // Uses the FIRST sheet in the spreadsheet
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
 
-    // Write header if sheet is empty
+    // Always write/overwrite header row
+    var header = ['Name','Subtitle','Set','Number','Rarity',
+      'Type','Aspects','Variant Type','Quantity',
+      'Market Price','Discounted Price','','Notes','Front Art'];
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Name','Subtitle','Set','Number','Rarity',
-        'Type','Aspects','Variant Type','Quantity',
-        'Market Price','Discounted Price','','Notes','Front Art']);
+      sheet.appendRow(header);
+    } else {
+      sheet.getRange(1, 1, 1, header.length).setValues([header]);
     }
 
     // Clear all data rows (keep header row 1)

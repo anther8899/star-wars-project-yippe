@@ -468,8 +468,7 @@
             <th>Aspects</th>
             <th>Variant</th>
             <th data-sort="quantity">Qty</th>
-            <th data-sort="marketPrice">Market $</th>
-            <th data-sort="discountedPrice">Price $</th>
+            <th data-sort="marketPrice">Price $</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -630,7 +629,7 @@
             case 'name':
               return a.name.localeCompare(b.name) * mult;
             case 'price':
-              return ((a.discountedPrice || a.marketPrice) - (b.discountedPrice || b.marketPrice)) * mult;
+              return (a.marketPrice - b.marketPrice) * mult;
             case 'set':
               return (a.set + String(a.number).padStart(4, '0')).localeCompare(b.set + String(b.number).padStart(4, '0')) * mult;
             case 'rarity':
@@ -699,7 +698,6 @@
           tile.className = `card-tile ${rarityClass}`;
 
           const variantLabel = card.variantType && card.variantType !== 'Normal' ? card.variantType : '';
-          const price = card.discountedPrice || card.marketPrice;
 
           let imageHTML;
           if (card.frontArt) {
@@ -716,7 +714,7 @@
               <div class="card-tile-name">${this.esc(card.name)}${card.subtitle ? ' — ' + this.esc(card.subtitle) : ''}</div>
               <div class="card-tile-meta">
                 <span>${this.esc(card.set)} #${card.number}</span>
-                <span class="card-tile-price">$${price.toFixed(2)}</span>
+                <span class="card-tile-price">$${card.marketPrice.toFixed(2)}</span>
               </div>
             </div>
           `;
@@ -732,7 +730,6 @@
         for (const card of cards) {
           const rarityColor = this.getRarityColor(card.rarity);
           const variantLabel = card.variantType && card.variantType !== 'Normal' ? card.variantType : '';
-          const price = card.discountedPrice || card.marketPrice;
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -752,8 +749,7 @@
             <td>${this.esc(card.aspects)}</td>
             <td>${this.esc(variantLabel || 'Normal')}</td>
             <td>${card.quantity}</td>
-            <td>$${card.marketPrice.toFixed(2)}</td>
-            <td style="color:var(--accent-green);font-weight:600">$${price.toFixed(2)}</td>
+            <td style="color:var(--accent-green);font-weight:600">$${card.marketPrice.toFixed(2)}</td>
           `;
           tbody.appendChild(tr);
         }
@@ -765,7 +761,7 @@
         const filtered = this.filteredCards;
         const totalQty = all.reduce((sum, c) => sum + c.quantity, 0);
         const uniqueCount = all.length;
-        const totalValue = all.reduce((sum, c) => sum + ((c.discountedPrice || c.marketPrice) * c.quantity), 0);
+        const totalValue = all.reduce((sum, c) => sum + (c.marketPrice * c.quantity), 0);
 
         document.getElementById('total-cards').textContent = `${totalQty} cards`;
         document.getElementById('unique-cards').textContent = `${uniqueCount} unique`;
